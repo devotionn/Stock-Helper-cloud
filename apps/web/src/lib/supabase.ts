@@ -1,11 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+function readRequiredClientEnv(name: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string {
+  const value = import.meta.env[name]?.trim()
+  if (!value) {
+    throw new Error(`缺少前端环境变量：${name}`)
+  }
+  return value
+}
 
-if (!supabaseUrl || !supabaseAnonKey) {
+const supabaseUrl = readRequiredClientEnv('VITE_SUPABASE_URL').replace(/\/+$/, '')
+const supabaseAnonKey = readRequiredClientEnv('VITE_SUPABASE_ANON_KEY')
+
+try {
+  const parsed = new URL(supabaseUrl)
+  if (!['https:', 'http:'].includes(parsed.protocol)) {
+    throw new Error('协议必须是 http 或 https')
+  }
+} catch (error) {
   throw new Error(
-    '缺少 Supabase 环境变量。请复制 .env.example 为 .env 并填写 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY',
+    `VITE_SUPABASE_URL 格式不正确：${error instanceof Error ? error.message : String(error)}`,
   )
 }
 
@@ -14,5 +27,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'stock-helper-cloud-web',
+    },
   },
 })
