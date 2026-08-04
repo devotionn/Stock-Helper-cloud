@@ -6,51 +6,43 @@ on:
       - main
       - develop
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   ci:
-    name: 类型检查与构建
+    name: 类型检查与生产构建
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: Checkout 代码
         uses: actions/checkout@v4
-
-      - name: 检查 pnpm-lock.yaml 是否存在
-        id: lockfile
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "pnpm-lock.yaml 已找到"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::未找到 pnpm-lock.yaml，跳过 CI 流程"
-          fi
+        with:
+          persist-credentials: false
 
       - name: 安装 pnpm
-        if: steps.lockfile.outputs.exists == 'true'
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.9
 
       - name: 安装 Node.js 20
-        if: steps.lockfile.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: 安装依赖
-        if: steps.lockfile.outputs.exists == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: 类型检查 (tsc)
-        if: steps.lockfile.outputs.exists == 'true'
-        run: pnpm typecheck
+      - name: 校验 Vercel 配置 JSON
+        run: node -e "JSON.parse(require('node:fs').readFileSync('vercel.json', 'utf8'))"
 
-      - name: 构建 (shared + web)
-        if: steps.lockfile.outputs.exists == 'true'
-        run: pnpm build
+      - name: 类型检查与生产构建
+        run: pnpm verify
