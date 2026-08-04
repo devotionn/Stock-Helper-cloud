@@ -1,0 +1,30 @@
+{
+  "name": "stock-helper-cloud",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter shared build && pnpm --filter web build",
+    "build:shared": "pnpm --filter shared build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:api",
+    "typecheck:api": "tsc -p tsconfig.api.json --noEmit",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:migration": "supabase migration new"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "dependencies": {
+    "@stock-helper/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@vercel/node": "^5.1.0",
+    "typescript": "^5.6.0"
+  }
+}

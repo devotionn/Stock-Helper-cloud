@@ -1,0 +1,36 @@
+name: Deploy Database
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - supabase/migrations/**
+
+concurrency:
+  group: deploy-database
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 推送数据库迁移
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: 关联 Supabase 项目
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: 推送迁移到远程数据库
+        run: supabase db push
