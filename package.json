@@ -9,7 +9,7 @@
     "build": "pnpm --filter shared build && pnpm --filter web build",
     "build:shared": "pnpm --filter shared build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck && pnpm typecheck:api",
+    "typecheck": "pnpm build:shared && pnpm --filter web typecheck && pnpm typecheck:api",
     "typecheck:api": "tsc -p tsconfig.api.json --noEmit",
     "verify": "pnpm typecheck && pnpm build",
     "db:reset": "supabase db reset",
