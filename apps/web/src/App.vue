@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, provide, onMounted, onUnmounted } from 'vue'
+import { ref, provide, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDateStore } from '@/stores/date'
 import type { ToastType } from '@/types'
@@ -40,10 +40,6 @@ function showToast(message: string, type: ToastType = 'success') {
 }
 
 provide('toast', showToast)
-
-onMounted(() => {
-  auth.init()
-})
 
 onUnmounted(() => {
   if (toastTimer) clearTimeout(toastTimer)

@@ -55,7 +55,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const routeDate = String(to.query.date || '')
   if (isValidRecordDate(routeDate)) {
     const dateStore = useDateStore()
@@ -63,6 +63,13 @@ router.beforeEach((to) => {
   }
 
   const auth = useAuthStore()
+  await auth.init()
+
+  if (to.name === 'login' && auth.isAuthenticated) {
+    const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'
+    return redirect
+  }
+
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
