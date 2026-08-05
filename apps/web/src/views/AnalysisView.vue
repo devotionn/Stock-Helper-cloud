@@ -92,7 +92,7 @@
           <div class="combination-info">
             <div class="combination-name">{{ combination.name }}</div>
             <div class="combination-modules">
-              {{ combination.module_ids.map(getModuleName).join(' -> ') }}
+              {{ sanitizeModuleIds(combination.module_ids).map(getModuleName).join(' -> ') }}
             </div>
           </div>
           <div class="combination-actions">
@@ -110,8 +110,12 @@
         <textarea
           v-model="analysisRequest"
           class="form-textarea"
+          :maxlength="MAX_ANALYSIS_REQUEST_LENGTH"
           placeholder="例如：重点分析本周大盘走势和个股机会，关注风险点..."
         ></textarea>
+        <div class="character-counter">
+          {{ analysisRequest.length }} / {{ MAX_ANALYSIS_REQUEST_LENGTH }}
+        </div>
       </div>
     </section>
 
@@ -121,7 +125,7 @@
         :disabled="selectedModules.length === 0 || analyzing"
         @click="startAnalysis"
       >
-        {{ analyzing ? '正在提交...' : `开始分析 ${recordDate}` }}
+        {{ analyzing ? '正在分析...' : `开始分析 ${recordDate}` }}
       </button>
       <p v-if="selectedModules.length === 0 && !analyzing" class="text-secondary mt-2">
         请先选择至少一个模块。
@@ -137,6 +141,7 @@
             <input
               v-model="newCombinationName"
               class="form-input"
+              :maxlength="MAX_COMBINATION_NAME_LENGTH"
               placeholder="请输入组合名称"
               @keyup.enter="saveCombination"
             />
@@ -163,8 +168,8 @@
     <div v-if="analyzing" class="modal-overlay analyzing-overlay">
       <div class="analyzing-box">
         <div class="loading-spinner"></div>
-        <div class="analyzing-text">正在提交 {{ recordDate }} 的分析任务...</div>
-        <div class="analyzing-sub">提交成功后会自动进入结果页面，AI 在后台完成分析。</div>
+        <div class="analyzing-text">正在分析 {{ recordDate }} 的投研数据...</div>
+        <div class="analyzing-sub">当前请求会等待 AI 返回完整结果，请保持页面和网络连接。</div>
       </div>
     </div>
   </div>
@@ -180,6 +185,12 @@ import { useCreateAnalysis } from '@/queries/analysis'
 import { formatRecordDate, isValidRecordDate } from '@/utils/date'
 import { MODULE_NAMES } from '@stock-helper/shared'
 import type { ToastType, Combination, ModuleEntry } from '@/types'
+
+const MAX_ANALYSIS_REQUEST_LENGTH = 4_000
+const MAX_COMBINATION_NAME_LENGTH = 100
+const MIN_MODULE_ID = 0
+const MAX_MODULE_ID = 11
+const MAX_MODULE_COUNT = 12
 
 const router = useRouter()
 const route = useRoute()
@@ -216,6 +227,19 @@ const confirmModal = ref<ConfirmModalState>({
   message: '',
   onConfirm: null,
 })
+
+function sanitizeModuleIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+
+  return [
+    ...new Set(
+      value.filter(
+        (item): item is number =>
+          Number.isInteger(item) && item >= MIN_MODULE_ID && item <= MAX_MODULE_ID,
+      ),
+    ),
+  ].slice(0, MAX_MODULE_COUNT)
+}
 
 function getCard(id: number): ModuleEntry | undefined {
   return cards.value.find((card) => card.module_id === id)
@@ -280,7 +304,13 @@ function clearAll(): void {
 }
 
 function useCombination(combination: Combination): void {
-  selectedModules.value = [...combination.module_ids]
+  const sanitized = sanitizeModuleIds(combination.module_ids)
+  if (!sanitized.length) {
+    showToast('该组合没有有效模块，请重新保存', 'warning')
+    return
+  }
+
+  selectedModules.value = sanitized
   showToast(`已载入组合"${combination.name}"`, 'success')
 }
 
@@ -302,7 +332,7 @@ async function saveCombination(): Promise<void> {
   try {
     await createCombinationMutation.mutateAsync({
       name,
-      moduleIds: [...selectedModules.value],
+      moduleIds: sanitizeModuleIds(selectedModules.value),
     })
     showToast('保存成功', 'success')
     showSaveModal.value = false
@@ -329,22 +359,24 @@ function deleteCombination(combinationId: string): void {
 }
 
 async function startAnalysis(): Promise<void> {
-  if (!selectedModules.value.length) {
+  const moduleIds = sanitizeModuleIds(selectedModules.value)
+  if (!moduleIds.length) {
     showToast('请先选择模块', 'warning')
     return
   }
   if (analyzing.value) return
+
   try {
     const result = await createAnalysisMutation.mutateAsync({
-      module_ids: [...selectedModules.value],
-      analysis_request: analysisRequest.value,
+      module_ids: moduleIds,
+      analysis_request: analysisRequest.value.trim(),
       combination_name: '',
       record_date: recordDate.value,
     })
-    showToast(`已提交 ${recordDate.value} 的分析任务`, 'success')
+    showToast(`${recordDate.value} 的分析已完成`, 'success')
     router.push({ path: `/result/${result.id}`, query: { date: recordDate.value } })
   } catch (err) {
-    showToast('分析启动失败：' + (err instanceof Error ? err.message : '请求失败'), 'error')
+    showToast('分析失败：' + (err instanceof Error ? err.message : '请求失败'), 'error')
   }
 }
 
@@ -355,14 +387,17 @@ function backToWorkspace(): void {
 onMounted(() => {
   const queryDate = String(route.query.date || '')
   if (isValidRecordDate(queryDate)) dateStore.setCurrentDate(queryDate)
+
   const combination = String(route.query.combination || '')
   if (combination) {
-    selectedModules.value = combination
-      .split(',')
-      .map((value) => Number.parseInt(value.trim(), 10))
-      .filter((value) => Number.isInteger(value) && value >= 0 && value <= 11)
+    selectedModules.value = sanitizeModuleIds(
+      combination.split(',').map((value) => Number.parseInt(value.trim(), 10)),
+    )
   }
-  if (route.query.request) analysisRequest.value = String(route.query.request)
+
+  if (route.query.request) {
+    analysisRequest.value = String(route.query.request).slice(0, MAX_ANALYSIS_REQUEST_LENGTH)
+  }
 })
 </script>
 
@@ -398,6 +433,12 @@ onMounted(() => {
   font-size: var(--font-size-base);
   color: var(--text-secondary);
   margin-bottom: 20px;
+}
+.character-counter {
+  margin-top: 8px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 .module-card.selected {
   border-color: var(--primary);
