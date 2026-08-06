@@ -71,9 +71,10 @@ export function getAiServerConfig(): AiServerConfig {
     apiKey: readRequiredEnv('AI_API_KEY'),
     baseUrl: (readOptionalEnv('AI_BASE_URL') ?? 'https://api.openai.com/v1').replace(/\/+$/, ''),
     model: readOptionalEnv('AI_MODEL') ?? 'gpt-4o',
-    timeoutMs: readIntegerEnv('AI_REQUEST_TIMEOUT_MS', 105_000, {
+    // Vercel 函数上限为 120 秒，必须为冷启动、数据库回写和响应序列化保留余量。
+    timeoutMs: readIntegerEnv('AI_REQUEST_TIMEOUT_MS', 80_000, {
       min: 5_000,
-      max: 115_000,
+      max: 90_000,
     }),
     useJsonResponseFormat: readBooleanEnv('AI_JSON_RESPONSE_FORMAT', true),
   }
